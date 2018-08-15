@@ -1,0 +1,38 @@
+﻿<Window x:Class="AttentionSelector.Timer"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AttentionSelector"
+        mc:Ignorable="d"
+        Title="Timer" Height="32" Width="140" WindowStyle="None" ResizeMode="NoResize" KeyDown="Window_KeyDown" KeyUp="Window_KeyUp" Topmost="True" ShowInTaskbar="False">
+  <Window.Background>
+    <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.ControlLightLightColorKey}}"/>
+  </Window.Background>
+  <Grid Margin="3" >
+    <Grid.Background>
+      <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+        <GradientStop Color="Black"/>
+        <GradientStop Color="#FF2E2E2E" Offset="1"/>
+      </LinearGradientBrush>
+    </Grid.Background>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="66*"></ColumnDefinition>
+      <ColumnDefinition Width="20*"></ColumnDefinition>
+    </Grid.ColumnDefinitions>
+    <Label Name="Label" Padding="0" Content="Work: 0:32:01" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Height="22" Margin="2">
+      <Label.Foreground>
+        <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"/>
+      </Label.Foreground>
+    </Label>
+    <CheckBox Name="Check" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Checked="Check_Checked" IsChecked="True"></CheckBox>
+    <Grid.ContextMenu>
+      <ContextMenu>
+        <MenuItem Name="PauseResume" Header="Pause" Click="PauseResume_Click"></MenuItem>
+        <MenuItem Name="SwitchWorkRelax" Header="Switch State" Click="SwitchWorkRelax_OnClick"></MenuItem>
+        <Separator />
+        <MenuItem Name="Exit" Header="Exit" Click="Exit_Click"></MenuItem>
+      </ContextMenu>
+    </Grid.ContextMenu>
+  </Grid>
+</Window>
