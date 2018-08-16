@@ -1,0 +1,3 @@
+workMinutes:=90
+relaxMinutes:=30
+waitForCheckMinutes:=1
