@@ -1,18 +1,13 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace AttentionSelector
 {
@@ -29,7 +24,10 @@ namespace AttentionSelector
             Pause
         }
 
-        private volatile State workState;        
+        private volatile State workState;
+
+        private Thread thread;
+        private object monitor = new object();
 
         public State WorkState
         {
@@ -93,9 +91,11 @@ namespace AttentionSelector
             InitializeComponent();
             try
             {
+                var t = Properties.Settings.Default["LeftOffset"].ToString();
                 Left = int.Parse(Properties.Settings.Default["LeftOffset"].ToString());
                 Top = int.Parse(Properties.Settings.Default["TopOffset"].ToString());
-            } catch (Exception e) { }
+            }
+            catch (Exception e) { }
 
             settings[Settings.StartTime] = DateTime.Now;
             settings[Settings.RelaxTime] = new TimeSpan(0, int.Parse(GetValueFromConfig("relaxMinutes")), 0);
@@ -106,16 +106,28 @@ namespace AttentionSelector
 
             AttentSelector.getInstance().Init();
 
-            new Thread(MainLogic).Start();
+            thread = new Thread(MainLogic);
+            thread.Start();
         }
 
         private void MainLogic()
         {
+            checkedToggle = false;
             TimeSpan offsetTime = DateTime.Now.TimeOfDay;
             TimeSpan startWaitToCheckStamp = DateTime.Now.TimeOfDay;
+            bool isContinueWait = false;
             while (true)
             {
-                Thread.Sleep(1000);
+                if (isContinueWait)
+                {
+                    isContinueWait = false;
+                }
+                else
+                {
+                    lock (monitor)   
+                        Monitor.Wait(monitor, TimeSpan.FromSeconds(1));   
+                }
+
                 switch (WorkState)
                 {
                     case State.Work:
@@ -127,8 +139,10 @@ namespace AttentionSelector
                         {
                             startWaitToCheckStamp = DateTime.Now.TimeOfDay - (TimeSpan) settings[Settings.CheckTime];
                             settings[Settings.PauseInRelax] = WorkState == State.Relax;
+                            if (!checkedToggle)
+                                Check.Dispatcher.BeginInvoke((Action) (() => Check.IsChecked = false));
                             SwitchStateTo(State.WaitToCheck);
-                            Check.Dispatcher.BeginInvoke((Action) (() => Check.IsChecked = false));
+                            isContinueWait = true;
                             continue;
                         }
 
@@ -137,27 +151,29 @@ namespace AttentionSelector
                             settings[Settings.PauseInRelax] = WorkState == State.Relax;
                             SwitchStateTo(State.Pause);
                             settings[Settings.CurrentOffsetToPause] = offsetTime;
+                            isContinueWait = true;
                             continue;
                         }
 
-                        Check.Dispatcher.BeginInvoke((Action)(() => Check.IsChecked = true));
-
                         Label.Dispatcher.BeginInvoke((Action)(() =>
                         {
-                            Label.Content = (WorkState == State.Work ? "Work: " : "Relax: ") + offsetTime.ToString("g").Split('.')[0];
+                            Label.Content = (WorkState == State.Work ? "Work: " : "Relax: ") + offsetTime.ToString("h\\:mm\\:ss");
                             Label.Foreground = WorkState == State.Work ? Brushes.CornflowerBlue : Brushes.GreenYellow;
                         }));
                         break;
                     case State.WaitToCheck:
                         Label.Dispatcher.BeginInvoke((Action)(() =>
                         {
-                            Label.Content = "Check";
+                            Label.Content = "WaitToCheck";
                             Label.Foreground = Brushes.DarkOrchid;
                         }));
 
                         if (checkedToggle)
                         {
-                            SwitchStateTo(!(bool)settings[Settings.PauseInRelax] ? State.Relax : State.Work);                      
+                            SwitchStateTo(!(bool)settings[Settings.PauseInRelax] ? State.Relax : State.Work);
+                            switchState = false;
+                            isContinueWait = true;
+                            continue;                  
                         }
                         else
                         {
@@ -167,6 +183,7 @@ namespace AttentionSelector
                                 if (switchState)
                                 {
                                     switchState = false;
+                                    isContinueWait = true;
                                     continue;
                                 }
                                 AttentSelector.getInstance().ShowWindow(Dispatcher);
@@ -178,7 +195,7 @@ namespace AttentionSelector
                     case State.Pause:
                         Label.Dispatcher.BeginInvoke((Action)(() =>
                         {
-                            Label.Content = "IS Pause";
+                            Label.Content = "Pause";
                             Label.Foreground = Brushes.Brown;
                         }));
                         
@@ -187,6 +204,8 @@ namespace AttentionSelector
                         {
                             SwitchStateTo((bool)settings[Settings.PauseInRelax] ? State.Relax : State.Work);
                             settings[Settings.StartTime] = DateTime.Now - (TimeSpan)settings[Settings.CurrentOffsetToPause];
+                            isContinueWait = true;
+                            continue;
                         }
                         break;
 
@@ -239,15 +258,23 @@ namespace AttentionSelector
         private void Check_Checked(object sender, RoutedEventArgs e)
         {
             checkedToggle = true;
+            
+            lock (monitor)   
+                Monitor.PulseAll(monitor);
         }
 
         private void PauseResume_Click(object sender, RoutedEventArgs e)
         {
+        
             if (WorkState == State.WaitToCheck)
                 return;
 
             isPause = !isPause;
             PauseResume.Header = isPause ? "Resume" : "Pause";
+            
+            lock (monitor)   
+                Monitor.PulseAll(monitor);
+            
         }
 
         private void SwitchWorkRelax_OnClick(object sender, RoutedEventArgs e)
@@ -256,6 +283,9 @@ namespace AttentionSelector
                 return;
 
             switchState = true;
+            
+            lock (monitor)   
+                Monitor.PulseAll(monitor);
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
